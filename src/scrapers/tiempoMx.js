@@ -12,9 +12,13 @@ async function fetchArticleLinks(limit) {
   $('a[href]').each((_, el) => {
     const href = $(el).attr('href');
     if (!href) return;
+    // Skip relative hrefs without leading slash (e.g. "hits/123")
+    if (!href.startsWith('/') && !href.startsWith('http')) return;
     const full = href.startsWith('http') ? href : `${BASE_URL}${href}`;
-    // Article URLs contain a date-like path segment or a long slug
-    if (full.startsWith(BASE_URL) && /\/\d{4}\//.test(full)) {
+    const path = full.replace(BASE_URL, '');
+    const parts = path.split('/').filter(Boolean);
+    // Article URLs follow /category/slug/ — exactly 2 path segments
+    if (full.startsWith(BASE_URL) && parts.length === 2 && !full.includes('static')) {
       links.add(full.split('?')[0]);
     }
   });
@@ -32,13 +36,17 @@ async function scrapeArticle(url) {
     '';
 
   const body = (() => {
-    // Common article content selectors
-    const selectors = ['.entry-content', '.post-content', 'article .content', '.article-body', 'article'];
+    const paras = $('article p')
+      .map((_, el) => $(el).text().trim())
+      .get()
+      .filter((t) => t.length > 40 && !t.startsWith('.') && !t.startsWith('{'));
+    if (paras.length) return paras.join('\n\n');
+    const selectors = ['.entry-content', '.post-content', '.article-body'];
     for (const sel of selectors) {
       const text = $(sel).first().text().trim();
       if (text.length > 200) return text;
     }
-    return $('p').map((_, el) => $(el).text().trim()).get().join('\n\n');
+    return '';
   })();
 
   const image =

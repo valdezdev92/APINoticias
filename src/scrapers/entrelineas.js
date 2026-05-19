@@ -14,7 +14,10 @@ async function fetchArticleLinks(limit) {
     if (!href) return;
     const full = href.startsWith('http') ? href : `${BASE_URL}${href}`;
     if (full.startsWith(BASE_URL) && full !== BASE_URL && full !== `${BASE_URL}/`) {
-      if (!/\/(page|categoria|tag|category|author)\//i.test(full) && full.split('/').length >= 5) {
+      const path = full.replace(BASE_URL, '');
+      const parts = path.split('/').filter(Boolean);
+      // Articles are at /slug/ (1 segment) — exclude section pages and utility pages
+      if (parts.length === 1 && !/^(page|categoria|tag|category|author|crealo|deportes|local|seguridad|mexico|espectaculos|columna|mundo|videos|#)/.test(parts[0])) {
         links.add(full.split('?')[0]);
       }
     }
@@ -33,12 +36,30 @@ async function scrapeArticle(url) {
     '';
 
   const body = (() => {
-    const selectors = ['.entry-content', '.post-content', '.single-content', 'article'];
+    // Site uses Elementor — content lives in the post-content widget
+    const elementorContent = $('[data-widget_type="theme-post-content.default"], .elementor-widget-theme-post-content');
+    if (elementorContent.length) {
+      const paras = elementorContent.find('p')
+        .map((_, el) => $(el).text().trim())
+        .get()
+        .filter((t) => t.length > 40);
+      if (paras.length) return paras.join('\n\n');
+      const text = elementorContent.first().text().trim();
+      if (text.length > 200) return text;
+    }
+    // Fallback: largest Elementor text block
+    let best = '';
+    $('[class*="elementor-element"]').each((_, el) => {
+      const text = $(el).clone().children('[class*="elementor"]').remove().end().text().trim();
+      if (text.length > best.length && text.length < 5000) best = text;
+    });
+    if (best.length > 200) return best;
+    const selectors = ['.entry-content', '.post-content', '.single-content'];
     for (const sel of selectors) {
       const text = $(sel).first().text().trim();
       if (text.length > 200) return text;
     }
-    return $('p').map((_, el) => $(el).text().trim()).get().join('\n\n');
+    return '';
   })();
 
   const image =
