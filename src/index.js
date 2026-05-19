@@ -38,7 +38,7 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => logger.info(`API Noticias corriendo en puerto ${PORT}`));
 
 // Scheduled cron job — default: every 2 hours
-const cronExpression = process.env.SCRAPE_CRON || '0 */2 * * *';
+const cronExpression = process.env.SCRAPE_CRON || '*/5 * * * *';
 if (cron.validate(cronExpression)) {
   cron.schedule(cronExpression, async () => {
     logger.info(`[cron] Ejecutando pipeline programado: ${cronExpression}`);
