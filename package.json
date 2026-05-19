@@ -1,0 +1,28 @@
+{
+  "name": "api-noticias",
+  "version": "1.0.0",
+  "description": "API para scraping de noticias, procesamiento con IA y publicación automática",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "scrape": "node src/scripts/runScraper.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.2",
+    "cheerio": "^1.0.0-rc.12",
+    "express": "^4.19.2",
+    "node-cron": "^3.0.3",
+    "openai": "^4.52.7",
+    "dotenv": "^16.4.5",
+    "puppeteer-core": "^22.12.1",
+    "winston": "^3.13.0",
+    "p-limit": "^3.1.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
