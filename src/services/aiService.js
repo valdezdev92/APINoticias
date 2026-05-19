@@ -1,5 +1,6 @@
 const OpenAI = require('openai');
 const logger = require('../utils/logger');
+const { AI_MAX_RETRIES, AI_RETRY_BASE_MS } = require('../config/constants');
 
 let _openai = null;
 function getClient() {
@@ -11,6 +12,7 @@ function getClient() {
   }
   return _openai;
 }
+
 const MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 
 const SYSTEM_PROMPT = `Eres un editor de noticias profesional para un periódico digital mexicano.
@@ -26,6 +28,23 @@ Reglas importantes:
 - No añadas información que no esté en el texto original.
 - Responde ÚNICAMENTE con un JSON válido, sin texto adicional.`;
 
+async function withRetry(fn) {
+  let lastError;
+  for (let attempt = 0; attempt <= AI_MAX_RETRIES; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err;
+      const isRateLimit = err?.status === 429 || String(err?.message).includes('429');
+      if (!isRateLimit || attempt === AI_MAX_RETRIES) throw err;
+      const delay = AI_RETRY_BASE_MS * Math.pow(2, attempt);
+      logger.warn(`[aiService] Rate limit, reintentando en ${delay}ms (intento ${attempt + 1}/${AI_MAX_RETRIES})`);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+  throw lastError;
+}
+
 async function rewriteArticle(raw) {
   const userPrompt = `Reescribe la siguiente noticia y devuelve un JSON con esta estructura exacta:
 {
@@ -39,18 +58,19 @@ Titular: ${raw.title}
 Contenido: ${raw.body.slice(0, 3000)}`;
 
   try {
-    const response = await getClient().chat.completions.create({
-      model: MODEL,
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: userPrompt },
-      ],
-      temperature: 0.7,
-      max_tokens: 1500,
+    const content = await withRetry(async () => {
+      const response = await getClient().chat.completions.create({
+        model: MODEL,
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature: 0.7,
+        max_tokens: 1500,
+      });
+      return response.choices[0].message.content.trim();
     });
 
-    const content = response.choices[0].message.content.trim();
-    // Strip markdown code fences if present
     const clean = content.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim();
     const parsed = JSON.parse(clean);
 
@@ -61,7 +81,6 @@ Contenido: ${raw.body.slice(0, 3000)}`;
     return parsed;
   } catch (err) {
     logger.error(`[aiService] Error procesando "${raw.title}": ${err.message}`);
-    // Fallback: return original content so the pipeline doesn't break
     return {
       title: raw.title,
       excerpt: raw.body.slice(0, 200),

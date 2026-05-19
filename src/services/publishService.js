@@ -14,7 +14,24 @@ const client = axios.create({
   timeout: 10000,
 });
 
+// In-memory set of normalized titles published during this process session
+const sessionTitles = new Set();
+
+function normalizeTitle(title) {
+  return title
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^\w\s]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 async function articleExists(title) {
+  const normalized = normalizeTitle(title);
+
+  if (sessionTitles.has(normalized)) return true;
+
   try {
     const { data } = await client.get('/entities/Article', {
       params: { q: JSON.stringify({ title }), limit: 1 },
@@ -44,6 +61,7 @@ async function publishArticle({ title, excerpt, body, category, image_url, autho
   };
 
   const { data } = await client.post('/entities/Article', payload);
+  sessionTitles.add(normalizeTitle(title));
   logger.info(`[publishService] Publicado: "${title}" (id: ${data.id})`);
   return data;
 }

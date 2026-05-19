@@ -1,7 +1,8 @@
 const cheerio = require('cheerio');
 const httpClient = require('../utils/httpClient');
-const logger = require('../utils/logger');
+const { detectCategory, runScrape } = require('./baseScraper');
 
+const SOURCE = 'laopcion.com.mx';
 const BASE_URL = 'https://laopcion.com.mx';
 
 async function fetchArticleLinks(limit) {
@@ -33,8 +34,7 @@ async function scrapeArticle(url) {
     '';
 
   const body = (() => {
-    const selectors = ['.entry-content', '.post-content', '.article-content', 'article'];
-    for (const sel of selectors) {
+    for (const sel of ['.entry-content', '.post-content', '.article-content', 'article']) {
       const text = $(sel).first().text().trim();
       if (text.length > 200) return text;
     }
@@ -46,36 +46,11 @@ async function scrapeArticle(url) {
     $('article img').first().attr('src') ||
     '';
 
-  return { title, body, image, url, source: 'laopcion.com.mx', category: detectCategory(title, body) };
-}
-
-function detectCategory(title, body) {
-  const text = (title + ' ' + body).toLowerCase();
-  if (/deporte|futbol|fútbol/.test(text)) return 'deportes';
-  if (/internacional|mundial/.test(text)) return 'internacional';
-  if (/estado|tamaulipas|nuevo laredo/.test(text)) return 'estatal';
-  if (/nacional|mexico|méxico/.test(text)) return 'nacional';
-  return 'local';
+  return { title, body, image, url, source: SOURCE, category: detectCategory(title, body) };
 }
 
 async function scrape(limit = 5) {
-  logger.info('[laopcion.com.mx] Iniciando scraping...');
-  const links = await fetchArticleLinks(limit);
-  logger.info(`[laopcion.com.mx] ${links.length} URLs encontradas`);
-
-  const articles = [];
-  for (const url of links) {
-    try {
-      const article = await scrapeArticle(url);
-      if (article.title && article.body.length > 100) {
-        articles.push(article);
-      }
-    } catch (err) {
-      logger.warn(`[laopcion.com.mx] Error en ${url}: ${err.message}`);
-    }
-  }
-  logger.info(`[laopcion.com.mx] ${articles.length} artículos extraídos`);
-  return articles;
+  return runScrape(SOURCE, fetchArticleLinks, scrapeArticle, limit);
 }
 
 module.exports = { scrape };

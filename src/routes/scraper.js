@@ -1,20 +1,24 @@
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const router = express.Router();
-const { runPipeline, availableSources } = require('../services/pipelineService');
+const { runPipeline, isPipelineRunning, availableSources } = require('../services/pipelineService');
 const logger = require('../utils/logger');
+const { RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX_REQUESTS } = require('../config/constants');
 
-// Track active run to avoid concurrent executions
-let running = false;
+const runLimiter = rateLimit({
+  windowMs: RATE_LIMIT_WINDOW_MS,
+  max: RATE_LIMIT_MAX_REQUESTS,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Demasiadas solicitudes. Intenta más tarde.' },
+});
 
-// GET /api/scraper/sources — list available sources
 router.get('/sources', (req, res) => {
   res.json({ sources: availableSources });
 });
 
-// POST /api/scraper/run — trigger pipeline manually
-// Body (optional): { "sources": ["tiempo.com.mx", "laparadoja.com.mx"] }
-router.post('/run', async (req, res) => {
-  if (running) {
+router.post('/run', runLimiter, async (req, res) => {
+  if (isPipelineRunning()) {
     return res.status(409).json({ error: 'El pipeline ya está en ejecución. Intenta más tarde.' });
   }
 
@@ -28,23 +32,15 @@ router.post('/run', async (req, res) => {
     return res.status(400).json({ error: 'No se encontraron fuentes válidas.', available: availableSources });
   }
 
-  running = true;
-  // Respond immediately and run in background
   res.json({ message: 'Pipeline iniciado', sources: selectedSources });
 
-  try {
-    const results = await runPipeline(selectedSources);
-    logger.info(`[route] Pipeline completado: ${JSON.stringify(results)}`);
-  } catch (err) {
-    logger.error(`[route] Pipeline falló: ${err.message}`);
-  } finally {
-    running = false;
-  }
+  runPipeline(selectedSources)
+    .then((results) => logger.info(`[route] Pipeline completado: ${JSON.stringify(results)}`))
+    .catch((err) => logger.error(`[route] Pipeline falló: ${err.message}`));
 });
 
-// GET /api/scraper/status — check if pipeline is running
 router.get('/status', (req, res) => {
-  res.json({ running });
+  res.json({ running: isPipelineRunning() });
 });
 
 module.exports = router;
