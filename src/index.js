@@ -38,7 +38,7 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => logger.info(`API Noticias corriendo en puerto ${PORT}`));
 
-const cronExpression = process.env.SCRAPE_CRON || '0 */2 * * *';
+const cronExpression = process.env.SCRAPE_CRON || '*/30 * * * *';
 if (cron.validate(cronExpression)) {
   cron.schedule(cronExpression, async () => {
     if (isPipelineRunning()) {
