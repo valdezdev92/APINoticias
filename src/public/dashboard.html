@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>APINoticias — Panel de Control</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+    }
+
+    header {
+      background: #1a1d27;
+      border-bottom: 1px solid #2d3148;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    header .logo { font-size: 22px; font-weight: 700; color: #fff; }
+    header .logo span { color: #6366f1; }
+    header .badge {
+      font-size: 11px;
+      background: #6366f120;
+      color: #818cf8;
+      border: 1px solid #6366f140;
+      border-radius: 99px;
+      padding: 2px 10px;
+    }
+
+    main { max-width: 900px; margin: 0 auto; padding: 32px 24px; }
+
+    /* API Key */
+    .card {
+      background: #1a1d27;
+      border: 1px solid #2d3148;
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin-bottom: 20px;
+    }
+    .card-title {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: #64748b;
+      margin-bottom: 14px;
+    }
+
+    label { font-size: 14px; color: #94a3b8; display: block; margin-bottom: 6px; }
+    input[type="text"], input[type="password"] {
+      width: 100%;
+      background: #0f1117;
+      border: 1px solid #2d3148;
+      border-radius: 8px;
+      color: #e2e8f0;
+      font-size: 14px;
+      padding: 10px 14px;
+      outline: none;
+      transition: border-color .15s;
+    }
+    input[type="text"]:focus, input[type="password"]:focus { border-color: #6366f1; }
+
+    /* Sources */
+    .sources-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .source-chip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #0f1117;
+      border: 1px solid #2d3148;
+      border-radius: 8px;
+      padding: 8px 14px;
+      cursor: pointer;
+      transition: border-color .15s, background .15s;
+      user-select: none;
+    }
+    .source-chip:hover { border-color: #6366f1; }
+    .source-chip.active {
+      border-color: #6366f1;
+      background: #6366f115;
+    }
+    .source-chip input { display: none; }
+    .source-chip .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #2d3148;
+      transition: background .15s;
+    }
+    .source-chip.active .dot { background: #6366f1; }
+    .source-chip span { font-size: 14px; color: #e2e8f0; }
+
+    /* Status bar */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+    }
+    .status-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: #22c55e;
+    }
+    .status-dot.running {
+      background: #f59e0b;
+      animation: pulse 1s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: .4; }
+    }
+
+    /* Buttons */
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      padding: 10px 20px;
+      transition: opacity .15s, transform .1s;
+    }
+    button:active { transform: scale(.97); }
+    button:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+
+    .btn-primary { background: #6366f1; color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: #4f46e5; }
+
+    /* Results */
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      margin-top: 4px;
+    }
+    .metric {
+      background: #0f1117;
+      border: 1px solid #2d3148;
+      border-radius: 8px;
+      padding: 14px 16px;
+      text-align: center;
+    }
+    .metric .num { font-size: 28px; font-weight: 700; color: #fff; }
+    .metric .lbl { font-size: 12px; color: #64748b; margin-top: 2px; }
+    .metric.ok .num { color: #22c55e; }
+    .metric.warn .num { color: #f59e0b; }
+    .metric.err .num { color: #f87171; }
+
+    /* Log */
+    .log {
+      background: #0a0c12;
+      border: 1px solid #2d3148;
+      border-radius: 8px;
+      padding: 14px 16px;
+      font-family: "Fira Code", "Cascadia Code", "Courier New", monospace;
+      font-size: 13px;
+      line-height: 1.7;
+      max-height: 220px;
+      overflow-y: auto;
+      color: #94a3b8;
+    }
+    .log .line-ok   { color: #22c55e; }
+    .log .line-warn { color: #f59e0b; }
+    .log .line-err  { color: #f87171; }
+    .log .line-info { color: #818cf8; }
+
+    /* Articles table */
+    .articles-wrap { overflow-x: auto; margin-top: 4px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead th {
+      text-align: left;
+      color: #64748b;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      font-size: 11px;
+      padding: 8px 12px;
+      border-bottom: 1px solid #2d3148;
+    }
+    tbody tr { border-bottom: 1px solid #1e2235; }
+    tbody tr:hover { background: #1e2235; }
+    tbody td { padding: 10px 12px; vertical-align: middle; }
+    .cat-badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 99px;
+      background: #6366f115;
+      color: #818cf8;
+      border: 1px solid #6366f130;
+    }
+    .article-title a { color: #e2e8f0; text-decoration: none; }
+    .article-title a:hover { color: #818cf8; }
+    .empty { color: #475569; font-size: 14px; text-align: center; padding: 24px 0; }
+
+    .hidden { display: none !important; }
+
+    .refresh-btn {
+      background: transparent;
+      border: 1px solid #2d3148 !important;
+      color: #94a3b8;
+      font-size: 13px;
+      padding: 6px 14px;
+    }
+    .refresh-btn:hover { border-color: #6366f1 !important; color: #e2e8f0; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">API<span>Noticias</span></div>
+  <div class="badge">Panel de Control</div>
+</header>
+
+<main>
+
+  <!-- API Key -->
+  <div class="card" id="apiKeyCard">
+    <div class="card-title">Autenticación</div>
+    <label for="apiKeyInput">API Key (dejar vacío si no está configurada)</label>
+    <input type="password" id="apiKeyInput" placeholder="x-api-key..." />
+  </div>
+
+  <!-- Fuentes -->
+  <div class="card">
+    <div class="card-title">Fuentes de noticias</div>
+    <div class="sources-grid" id="sourcesGrid">
+      <p class="empty">Cargando fuentes...</p>
+    </div>
+  </div>
+
+  <!-- Ejecutar -->
+  <div class="card">
+    <div class="card-title">Ejecución</div>
+    <div class="status-bar">
+      <div class="status-indicator">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="statusText">Inactivo</span>
+      </div>
+      <button class="btn-primary" id="runBtn" onclick="runScraper()">
+        ▶ Ejecutar Scraper
+      </button>
+    </div>
+
+    <!-- Métricas (ocultas al inicio) -->
+    <div id="metricsSection" class="hidden" style="margin-top:20px;">
+      <div class="metrics">
+        <div class="metric ok">
+          <div class="num" id="mScraped">—</div>
+          <div class="lbl">Extraídos</div>
+        </div>
+        <div class="metric ok">
+          <div class="num" id="mProcessed">—</div>
+          <div class="lbl">Procesados (IA)</div>
+        </div>
+        <div class="metric ok">
+          <div class="num" id="mPublished">—</div>
+          <div class="lbl">Publicados</div>
+        </div>
+        <div class="metric err">
+          <div class="num" id="mErrors">—</div>
+          <div class="lbl">Errores</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Log -->
+    <div id="logSection" style="margin-top:16px;">
+      <div class="log" id="logBox">
+        <span class="line-info">→ Listo para ejecutar.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Artículos recientes -->
+  <div class="card">
+    <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;">
+      <span>Artículos recientes</span>
+      <button class="refresh-btn" onclick="loadArticles()">↻ Actualizar</button>
+    </div>
+    <div class="articles-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Título</th>
+            <th>Categoría</th>
+            <th>Fuente</th>
+            <th>Fecha</th>
+          </tr>
+        </thead>
+        <tbody id="articlesBody">
+          <tr><td colspan="4" class="empty">Cargando artículos...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<script>
+  const KEY_STORAGE = 'apinoticias_api_key';
+  let pollInterval = null;
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+  function apiKey() {
+    return document.getElementById('apiKeyInput').value.trim() ||
+           localStorage.getItem(KEY_STORAGE) || '';
+  }
+
+  function headers() {
+    const h = { 'Content-Type': 'application/json' };
+    const k = apiKey();
+    if (k) h['x-api-key'] = k;
+    return h;
+  }
+
+  function log(msg, type = 'info') {
+    const box = document.getElementById('logBox');
+    const line = document.createElement('div');
+    const ts = new Date().toLocaleTimeString('es-MX');
+    line.innerHTML = `<span class="line-${type}">[${ts}] ${msg}</span>`;
+    box.appendChild(line);
+    box.scrollTop = box.scrollHeight;
+  }
+
+  function clearLog() {
+    document.getElementById('logBox').innerHTML = '';
+  }
+
+  // ── Persist API key ───────────────────────────────────────────────────────
+  document.getElementById('apiKeyInput').addEventListener('change', () => {
+    const val = document.getElementById('apiKeyInput').value.trim();
+    if (val) localStorage.setItem(KEY_STORAGE, val);
+    else localStorage.removeItem(KEY_STORAGE);
+  });
+
+  // Restore saved key
+  const saved = localStorage.getItem(KEY_STORAGE);
+  if (saved) document.getElementById('apiKeyInput').value = saved;
+
+  // ── Sources ───────────────────────────────────────────────────────────────
+  async function loadSources() {
+    try {
+      const res = await fetch('/api/scraper/sources', { headers: headers() });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const { sources } = await res.json();
+      renderSources(sources);
+    } catch (e) {
+      document.getElementById('sourcesGrid').innerHTML =
+        `<p class="empty">Error al cargar fuentes: ${e.message}</p>`;
+    }
+  }
+
+  function renderSources(sources) {
+    const grid = document.getElementById('sourcesGrid');
+    grid.innerHTML = '';
+    sources.forEach(src => {
+      const chip = document.createElement('label');
+      chip.className = 'source-chip' + (src === 'tiempo.com.mx' ? ' active' : '');
+      chip.innerHTML = `
+        <input type="checkbox" value="${src}" ${src === 'tiempo.com.mx' ? 'checked' : ''} />
+        <div class="dot"></div>
+        <span>${src}</span>`;
+      chip.querySelector('input').addEventListener('change', e => {
+        chip.classList.toggle('active', e.target.checked);
+      });
+      grid.appendChild(chip);
+    });
+  }
+
+  function selectedSources() {
+    return [...document.querySelectorAll('#sourcesGrid input:checked')].map(i => i.value);
+  }
+
+  // ── Status polling ────────────────────────────────────────────────────────
+  async function checkStatus() {
+    try {
+      const res = await fetch('/api/scraper/status', { headers: headers() });
+      if (!res.ok) return;
+      const { running } = await res.json();
+      setRunning(running);
+      if (!running && pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+        log('Pipeline finalizado. Recargando artículos...', 'ok');
+        setTimeout(loadArticles, 1500);
+      }
+    } catch (_) {}
+  }
+
+  function setRunning(running) {
+    const dot  = document.getElementById('statusDot');
+    const text = document.getElementById('statusText');
+    const btn  = document.getElementById('runBtn');
+    dot.className  = 'status-dot' + (running ? ' running' : '');
+    text.textContent = running ? 'Ejecutando...' : 'Inactivo';
+    btn.disabled = running;
+  }
+
+  // ── Run scraper ───────────────────────────────────────────────────────────
+  async function runScraper() {
+    const sources = selectedSources();
+    if (!sources.length) {
+      alert('Selecciona al menos una fuente.');
+      return;
+    }
+
+    clearLog();
+    document.getElementById('metricsSection').classList.add('hidden');
+    log(`Iniciando pipeline para: ${sources.join(', ')}`, 'info');
+    setRunning(true);
+
+    try {
+      const res = await fetch('/api/scraper/run', {
+        method: 'POST',
+        headers: headers(),
+        body: JSON.stringify({ sources }),
+      });
+
+      if (res.status === 409) {
+        log('El pipeline ya está en ejecución.', 'warn');
+        setRunning(true);
+      } else if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        log(`Error: ${err.error || res.status}`, 'err');
+        setRunning(false);
+        return;
+      } else {
+        const data = await res.json();
+        log(`Pipeline en progreso — fuentes: ${(data.sources || sources).join(', ')}`, 'ok');
+      }
+    } catch (e) {
+      log(`Error de conexión: ${e.message}`, 'err');
+      setRunning(false);
+      return;
+    }
+
+    // Poll every 3s
+    if (pollInterval) clearInterval(pollInterval);
+    pollInterval = setInterval(checkStatus, 3000);
+  }
+
+  // ── Articles ──────────────────────────────────────────────────────────────
+  async function loadArticles() {
+    const tbody = document.getElementById('articlesBody');
+    tbody.innerHTML = '<tr><td colspan="4" class="empty">Cargando...</td></tr>';
+    try {
+      const res = await fetch('/api/articles?limit=20&sort_by=-creation_date', { headers: headers() });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const list = Array.isArray(data) ? data : (data.items || data.articles || []);
+      renderArticles(list);
+    } catch (e) {
+      tbody.innerHTML = `<tr><td colspan="4" class="empty">Error: ${e.message}</td></tr>`;
+    }
+  }
+
+  function renderArticles(list) {
+    const tbody = document.getElementById('articlesBody');
+    if (!list.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="empty">No hay artículos publicados aún.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = list.map(a => {
+      const date = a.creation_date
+        ? new Date(a.creation_date).toLocaleDateString('es-MX', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })
+        : '—';
+      const title = a.title || 'Sin título';
+      const url   = a.url || '#';
+      const cat   = a.category || '—';
+      const src   = a.author || a.source || '—';
+      return `<tr>
+        <td class="article-title"><a href="${url}" target="_blank">${title}</a></td>
+        <td><span class="cat-badge">${cat}</span></td>
+        <td style="color:#64748b;font-size:12px">${src}</td>
+        <td style="color:#64748b;font-size:12px;white-space:nowrap">${date}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+  loadSources();
+  loadArticles();
+  checkStatus();
+</script>
+</body>
+</html>

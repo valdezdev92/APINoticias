@@ -15,6 +15,9 @@ if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir);
 const app = express();
 app.use(express.json());
 
+// Serve dashboard before auth so the HTML loads without a key
+app.use(express.static(path.join(__dirname, 'public')));
+
 // Simple API key middleware for incoming requests
 app.use((req, res, next) => {
   const key = req.headers['x-api-key'];
