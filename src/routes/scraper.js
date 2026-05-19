@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { runPipeline, availableSources } = require('../services/pipelineService');
+const { runPipeline, availableSources, defaultSources } = require('../services/pipelineService');
 const logger = require('../utils/logger');
 
 // Track active run to avoid concurrent executions
@@ -22,7 +22,7 @@ router.post('/run', async (req, res) => {
   const selectedSources =
     Array.isArray(sources) && sources.length > 0
       ? sources.filter((s) => availableSources.includes(s))
-      : availableSources;
+      : defaultSources;
 
   if (selectedSources.length === 0) {
     return res.status(400).json({ error: 'No se encontraron fuentes válidas.', available: availableSources });

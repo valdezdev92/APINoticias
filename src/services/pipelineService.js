@@ -10,11 +10,13 @@ const scrapers = {
   'entrelineas.com.mx': require('../scrapers/entrelineas'),
 };
 
+const DEFAULT_SOURCES = ['tiempo.com.mx'];
+
 const LIMIT_PER_SOURCE = parseInt(process.env.MAX_ARTICLES_PER_SOURCE || '5', 10);
 // Limit concurrent OpenAI calls to avoid rate limits
 const aiConcurrency = pLimit(2);
 
-async function runPipeline(sources = Object.keys(scrapers)) {
+async function runPipeline(sources = DEFAULT_SOURCES) {
   const results = { scraped: 0, processed: 0, published: 0, errors: [] };
 
   logger.info(`[pipeline] Iniciando pipeline para fuentes: ${sources.join(', ')}`);
@@ -69,4 +71,4 @@ async function runPipeline(sources = Object.keys(scrapers)) {
   return results;
 }
 
-module.exports = { runPipeline, availableSources: Object.keys(scrapers) };
+module.exports = { runPipeline, availableSources: Object.keys(scrapers), defaultSources: DEFAULT_SOURCES };
